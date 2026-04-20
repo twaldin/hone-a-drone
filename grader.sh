@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
-# grader.sh <planner_path>
-# Called by hone as: ./grader.sh <temp_file_with_planner_code>
-# Stdout: per-rollout JSON lines + aggregate score float on final line
-# Stderr: human-readable per-rollout lines (consumed by GEPA mutator)
+# grader.sh <arg>
+# v1 single-file: arg is a path to a planner.py (or temp .prompt file).
+# v2 dir-mode: arg is a directory; we use <dir>/planner.py as the planner.
 set -euo pipefail
 
-PLANNER="$1"
+ARG="$1"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PYTHON="$SCRIPT_DIR/.venv/bin/python"
+
+if [ -d "$ARG" ]; then
+    PLANNER="$ARG/planner.py"
+else
+    PLANNER="$ARG"
+fi
 
 exec "$PYTHON" "$SCRIPT_DIR/run_parallel.py" \
     --planner "$PLANNER" \

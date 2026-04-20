@@ -1,0 +1,10 @@
+{
+  "rules": [
+    {"field": "crash_reason", "when_equals": "out_of_bounds", "target": "planner.py"},
+    {"field": "crash_reason", "when_equals": "collision",    "target": "planner.py"},
+    {"field": "crash_reason", "when_equals": "gate_miss",    "target": "gate_detector.py"},
+    {"field": "gates_passed", "when_eq": 0,                  "target": "world_model.py"},
+    {"field": "loop_latency_p99", "when_gt": 1.0,            "target": "attitude_ctrl.py"}
+  ],
+  "fallback": "round-robin"
+}
