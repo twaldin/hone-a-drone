@@ -25,6 +25,17 @@ def _load_planner_cls(path: str):
     # Force SourceFileLoader so non-.py suffixes (e.g., hone's /tmp/*.prompt) work.
     from importlib.machinery import SourceFileLoader
 
+    # v3: put the planner's containing dir at the FRONT of sys.path so sibling
+    # helper modules (attitude_ctrl.py, state_estimator.py, etc.) are importable
+    # by the planner when it's loaded. Lets the mutator compose a multi-file
+    # controller without needing package-level imports.
+    planner_dir = str(Path(path).parent.resolve())
+    if planner_dir not in sys.path:
+        sys.path.insert(0, planner_dir)
+    # Purge any cached sibling modules from prior rollouts so fresh sources are loaded.
+    for mod_name in ("attitude_ctrl", "state_estimator", "gate_detector", "world_model"):
+        sys.modules.pop(mod_name, None)
+
     loader = SourceFileLoader("_planner_candidate", path)
     spec = importlib.util.spec_from_loader("_planner_candidate", loader)
     if spec is None:

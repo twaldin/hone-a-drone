@@ -14,7 +14,7 @@ siblings propagate to the graded code path.
 from __future__ import annotations
 
 import numpy as np
-from scipy.interpolate import CubicSpline
+from scipy.interpolate import PchipInterpolator
 from scipy.spatial.transform import Rotation
 
 # Sibling composition (files in same controllers/ dir, loaded via sys.path
@@ -25,14 +25,18 @@ from state_estimator import StateEstimator
 from world_model import WorldModel
 
 # --- Tunable parameters (primary hone targets) ---
-CRUISE_SPEED: float = 1.5     # m/s nominal traversal speed along path
+CRUISE_SPEED: float = 1.35    # m/s nominal traversal speed along path
 MAX_SPEED: float = 2.5        # m/s clamp on planned velocity norm
-APPROACH_DIST: float = 0.5    # m before gate center, along gate normal
-EXIT_DIST: float = 0.5        # m after gate center, along exit direction
-LIFTOFF_FRAC: float = 0.5     # fraction of height to first gate used for liftoff wpt
+APPROACH_DIST: float = 0.55   # m before gate center, along gate normal
+EXIT_DIST: float = 0.6        # m after gate center, along exit direction
+LIFTOFF_FRAC: float = 0.4     # fraction of height to first gate used for liftoff wpt
 MIN_SEGMENT_TIME: float = 0.5  # s minimum time per waypoint segment
 OBSTACLE_RADIUS: float = 0.2  # m safety bubble around each obstacle axis (xy)
 OBSTACLE_AVOID_OFFSET: float = 0.35  # m lateral offset when adding avoidance waypoint
+MAX_LIFTOFF_XY_SHIFT: float = 0.18  # m limit on initial xy slide toward first gate
+STRAIGHTEN_DIST: float = 0.28  # m extra waypoint after gate before allowing a turn
+TURN_SHARP_COS: float = 0.35  # add straightening waypoint when turn is sharper than this
+LAST_EXIT_DIST: float = 0.42  # m just enough to clear the final gate frame
 
 
 class Planner:
@@ -129,13 +133,16 @@ def _build_waypoints(
     """
     wpts: list[np.ndarray] = [start.copy()]
 
-    # Liftoff waypoint: same x,y as approach to gate 0, elevated
+    # Liftoff waypoint: mostly vertical, but with a small capped xy bias toward the
+    # first gate so the initial spline does not kink into a large lateral sweep.
     g0 = gates_pos[0]
     approach0_dir = _gate_dir(start, g0)
     liftoff = start.copy()
     liftoff[2] = start[2] + LIFTOFF_FRAC * (g0[2] - start[2] + 0.3)
-    # Slide forward 20% of the way toward first gate to avoid backward spline
-    liftoff[:2] = start[:2] + 0.2 * approach0_dir[:2] * np.linalg.norm(g0[:2] - start[:2])
+    # Randomized starts are most fragile right after takeoff. Keep liftoff nearly
+    # vertical, but allow a small lead-in toward the first gate to reduce the
+    # curvature spike between liftoff and the first approach waypoint.
+    liftoff[:2] = start[:2] + MAX_LIFTOFF_XY_SHIFT * approach0_dir[:2]
     wpts.append(liftoff)
 
     prev = liftoff.copy()
@@ -151,18 +158,41 @@ def _build_waypoints(
         # Gate normal: pick the ±x-axis of gate frame that best aligns with flow_dir.
         normal = _gate_normal_aligned(quat, flow_dir)
 
-        approach_wpt = pos - APPROACH_DIST * normal
-        exit_wpt = pos + EXIT_DIST * normal
+        if i + 1 < n:
+            next_gate = gates_pos[i + 1]
+            gate_spacing = float(np.linalg.norm(next_gate - pos))
+        else:
+            gate_spacing = float(np.linalg.norm(pos - prev))
+
+        approach_dist = min(APPROACH_DIST, 0.35 * gate_spacing)
+        exit_dist = min(EXIT_DIST, 0.4 * gate_spacing)
+        if i + 1 == n:
+            exit_dist = min(exit_dist, LAST_EXIT_DIST)
+        approach_wpt = pos - approach_dist * normal
+        exit_wpt = pos + max(exit_dist, 0.41) * normal
+        straighten_wpt = None
+
+        if i + 1 < n:
+            next_gate = gates_pos[i + 1]
+            desired_after_gate = _gate_dir(pos, next_gate)
+            turn_cos = float(np.dot(normal, desired_after_gate))
+            if turn_cos < TURN_SHARP_COS:
+                straighten_dist = min(STRAIGHTEN_DIST, 0.2 * gate_spacing)
+                straighten_wpt = pos + max(exit_dist, 0.41) * normal + straighten_dist * normal
 
         # Shift approach/exit waypoints if they land inside an obstacle's xy bubble
         if obstacles_pos is not None and len(obstacles_pos) > 0:
             approach_wpt = _nudge_off_obstacles(approach_wpt, obstacles_pos, normal)
             exit_wpt = _nudge_off_obstacles(exit_wpt, obstacles_pos, normal)
+            if straighten_wpt is not None:
+                straighten_wpt = _nudge_off_obstacles(straighten_wpt, obstacles_pos, normal)
 
         wpts.append(approach_wpt)
         wpts.append(pos.copy())
         wpts.append(exit_wpt)
-        prev = pos.copy()
+        if straighten_wpt is not None:
+            wpts.append(straighten_wpt)
+        prev = straighten_wpt if straighten_wpt is not None else exit_wpt
 
     return np.array(wpts)
 
@@ -209,6 +239,11 @@ def _assign_times(wpts: np.ndarray) -> np.ndarray:
     return np.concatenate([[0.0], np.cumsum(seg_times)])
 
 
-def _fit_spline(wpts: np.ndarray, times: np.ndarray) -> CubicSpline:
-    """Fit a cubic spline through waypoints with clamped endpoint derivatives."""
-    return CubicSpline(times, wpts, bc_type="not-a-knot")
+def _fit_spline(wpts: np.ndarray, times: np.ndarray) -> PchipInterpolator:
+    """Fit a shape-preserving spline through waypoints.
+
+    Randomized tracks can make unconstrained cubic splines swing wide outside the
+    corridor between gates. PCHIP is less smooth but strongly reduces overshoot,
+    which improves robustness on level 2/3.
+    """
+    return PchipInterpolator(times, wpts, axis=0)

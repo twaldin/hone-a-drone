@@ -1,20 +1,15 @@
-"""Minimum-snap inspired trajectory planner for drone racing.
+"""Conservative waypoint planner for drone racing.
 
-Geometric path: cubic spline (scipy) through carefully chosen gate waypoints.
-Timing: constant arc-speed with a conservative speed cap, clamped so the
-Mellinger controller can track reliably.
+Geometric path: straight, time-parameterized segments through carefully chosen
+gate waypoints. Timing: constant arc-speed with conservative segment timing so
+the Mellinger controller can track without overshooting wide turns.
 
-Reference math: Richter, Bry, Roy 2016 (min-snap philosophy).
-
-v3: composes with sibling modules in controllers/. Obs flow through
-`StateEstimator`, gate info through `GateDetector` + `WorldModel`, action
-assembly through `attitude_ctrl.make_state_command`. Edits to any of those
-siblings propagate to the graded code path.
+v4: keeps the sibling-module composition but removes interpolator-induced path
+bulging on sharp layouts, which was the main out-of-bounds failure mode.
 """
 from __future__ import annotations
 
 import numpy as np
-from scipy.interpolate import CubicSpline
 from scipy.spatial.transform import Rotation
 
 # Sibling composition (files in same controllers/ dir, loaded via sys.path
@@ -27,8 +22,8 @@ from world_model import WorldModel
 # --- Tunable parameters (primary hone targets) ---
 CRUISE_SPEED: float = 1.5     # m/s nominal traversal speed along path
 MAX_SPEED: float = 2.5        # m/s clamp on planned velocity norm
-APPROACH_DIST: float = 0.5    # m before gate center, along gate normal
-EXIT_DIST: float = 0.5        # m after gate center, along exit direction
+APPROACH_DIST: float = 0.65   # m before gate center, along gate normal
+EXIT_DIST: float = 0.65       # m after gate center, along exit direction
 LIFTOFF_FRAC: float = 0.5     # fraction of height to first gate used for liftoff wpt
 MIN_SEGMENT_TIME: float = 0.5  # s minimum time per waypoint segment
 OBSTACLE_RADIUS: float = 0.2  # m safety bubble around each obstacle axis (xy)
@@ -36,9 +31,9 @@ OBSTACLE_AVOID_OFFSET: float = 0.35  # m lateral offset when adding avoidance wa
 
 
 class Planner:
-    """Cubic-spline drone racing trajectory planner.
+    """Time-parameterized waypoint planner.
 
-    Builds a smooth path through all gates with approach/exit waypoints
+    Builds a conservative path through all gates with approach/exit waypoints
     and parameterizes it by arc-length-proportional time at CRUISE_SPEED.
     """
 
@@ -62,13 +57,13 @@ class Planner:
 
         wpts = _build_waypoints(start_pos, gates_pos, gates_quat, obstacles_pos)
         times = _assign_times(wpts)
-        self._spline = _fit_spline(wpts, times)
+        self._path = _fit_spline(wpts, times)
         self._duration: float = float(times[-1])
 
     def compute_target(self, obs: dict, info: dict | None, t: float) -> np.ndarray:
         """Return desired state [pos(3), vel(3), acc(3), yaw, rates(3)] at time t."""
         t_c = float(np.clip(t, 0.0, self._duration))
-        pos = self._spline(t_c)
+        pos = self._path(t_c)
 
         if t >= self._duration:
             self._finished = True
@@ -209,6 +204,34 @@ def _assign_times(wpts: np.ndarray) -> np.ndarray:
     return np.concatenate([[0.0], np.cumsum(seg_times)])
 
 
-def _fit_spline(wpts: np.ndarray, times: np.ndarray) -> CubicSpline:
-    """Fit a cubic spline through waypoints with clamped endpoint derivatives."""
-    return CubicSpline(times, wpts, bc_type="not-a-knot")
+class _PiecewiseLinearPath:
+    """Evaluate a waypoint path without introducing curve overshoot."""
+
+    def __init__(self, wpts: np.ndarray, times: np.ndarray) -> None:
+        self._wpts = np.asarray(wpts, dtype=float)
+        self._times = np.asarray(times, dtype=float)
+
+    def __call__(self, t: float) -> np.ndarray:
+        if t <= self._times[0]:
+            return self._wpts[0].copy()
+        if t >= self._times[-1]:
+            return self._wpts[-1].copy()
+
+        idx = int(np.searchsorted(self._times, t, side="right") - 1)
+        t0 = self._times[idx]
+        t1 = self._times[idx + 1]
+        if t1 <= t0:
+            return self._wpts[idx + 1].copy()
+
+        alpha = (t - t0) / (t1 - t0)
+        return (1.0 - alpha) * self._wpts[idx] + alpha * self._wpts[idx + 1]
+
+
+def _fit_spline(wpts: np.ndarray, times: np.ndarray) -> _PiecewiseLinearPath:
+    """Fit a path evaluator through waypoints.
+
+    Straight segments are less elegant than cubic interpolation but much more
+    robust on randomized tracks because they cannot bulge outside the waypoint
+    corridor between gates.
+    """
+    return _PiecewiseLinearPath(wpts, times)
