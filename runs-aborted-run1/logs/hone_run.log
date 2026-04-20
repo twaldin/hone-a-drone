@@ -1,0 +1,592 @@
+budget=100
+seed=/Users/twaldin/dev/hone-a-drone/controllers/planner.py (8075 chars)
+grader=/Users/twaldin/dev/hone-a-drone/grader.sh
+mutations log=/Users/twaldin/dev/hone-a-drone/runs/mutations.jsonl
+output=/Users/twaldin/dev/hone-a-drone/controllers/planner.py.best.md
+Iteration 0: Base program full valset score: 0.8093319751054235 over 1 / 1 examples
+Iteration 1: Selected program 0 score: 0.8093319751054235
+Iteration 1: Proposed new text for instruction: Drone racing cubic-spline planner. Score 0.809 — below identifies why and what to fix.
+
+SCORE BREAKDOWN (level weights L0=1.0 L1=1.5 L2=2.0 L3=3.0):
+L3 (random tracks) dominates total score. Generalize; never hardcode positions.
+
+KNOWN ROOT CAUSES OF MISSED GATES / CRASHES:
+1. Flat 1.5 m/s speed profile → drone arrives late on long straights, rushes
+   tight corners. Use curvature-aware timing: slow segments with high spline
+   curvature, allow faster speed on long straight segments (up to 2.5 m/s).
+2. Approach angle > 25° precedes most gate misses on L2/L3. Wider approach
+   dist (0.7 m) + tighter exit dist (0.4 m) reduces the worst angles.
+3. flow_dir computed from prev-waypoint-to-next-gate is noisy when the prev
+   point is an exit waypoint (not the gate center). Compute flow_dir from
+   gate[i-1] center to gate[i+1] center (skip the synthetic waypoints) for
+   cleaner gate normal alignment.
+4. Liftoff waypoint occasionally causes backward-curving spline when start Z
+   is already close to gate 0 Z. Guard: if g0[2] - start[2] < 0.2, skip
+   the liftoff waypoint entirely and go direct.
+
+KNOWN-GOOD DECISIONS — DO NOT CHANGE:
+- Gate normal: Rotation.from_quat(q).apply([1,0,0]), sign to match flow_dir
+- Output: pos-only 13-element float32; vel=acc=yaw_rate=0.0 (empirically stable)
+- CubicSpline "not-a-knot"; obstacle nudge perpendicular to gate normal
+- No imports beyond numpy, scipy, toppra
+
+PARAMETER SEARCH SPACE (highest impact first):
+- CRUISE_SPEED: 2.0–2.2 (raise from 1.5)
+- APPROACH_DIST: 0.65–0.8 (raise from 0.5)
+- EXIT_DIST: 0.35–0.45 (lower from 0.5)
+- MIN_SEGMENT_TIME: 0.3–0.4 (lower from 0.5)
+
+Implement curvature-aware speed scaling in _assign_times: after fitting a
+preliminary spline, sample curvature κ at each waypoint, then scale each
+segment time by max(1.0, κ * CURVATURE_SCALE) so tight corners get longer
+time budgets automatically.
+Iteration 1: New subsample score 0.0 is not better than old score 2.427995925316271, skipping
+Iteration 2: Selected program 0 score: 0.8093319751054235
+Iteration 2: Proposed new text for instruction: Drone racing planner scoring 0.809 at conservative 1.5 m/s cruise. The instruction docstring needs to guide the mutation agent toward specific, high-impact improvements.
+
+Drone racing planner currently at 0.809 with 1.5 m/s cruise speed and basic cubic spline. Key levers: speed increase (Mellinger handles up to ~3 m/s), better approach-angle alignment, and smoother waypoint geometry for L3 robustness.
+
+Drone racing trajectory planner — current benchmark: 0.809 (20 rollouts, 4 levels × 5 seeds).
+
+Architecture: cubic spline through start → liftoff → (approach, center, exit)×gates,
+constant arc-speed timing at 1.5 m/s. Position-only Mellinger commands (vel/acc=0).
+
+HIGHEST-IMPACT IMPROVEMENTS TO TRY (in priority order):
+
+1. SPEED: Raise CRUISE_SPEED to 2.0–2.2 m/s, MAX_SPEED to 3.0 m/s.
+   The 1.5 m/s cruise is leaving ~30% lap-time on the table. Mellinger tracks
+   reliably up to ~3 m/s. More speed = lower lap_time = higher score, especially
+   for L0/L1 where the track is fixed and predictable.
+
+2. APPROACH ALIGNMENT: Compute flow_dir as the vector from the PREVIOUS gate center
+   (not the previous waypoint cluster) through the current gate center. This gives
+   a cleaner, more consistent approach angle (<20°) and avoids the spline curling
+   back when approach/exit waypoints are placed relative to an already-offset prev.
+
+3. DROP THE CENTER WAYPOINT: Spline through approach and exit only — omit the
+   explicit gate-center waypoint. Fewer knots → smoother curvature → less
+   overshoot and oscillation mid-gate. Keep APPROACH_DIST=0.6m, EXIT_DIST=0.6m
+   so the drone crosses cleanly through the 0.36m gate frame.
+
+4. LIFTOFF TUNING: Current liftoff_frac=0.5 often undershoots gate 0 altitude.
+   Set liftoff z = gate0_z + 0.1 m directly (not a fraction of delta), and move
+   the liftoff xy 30% of the way to gate 0 (not 20%) to flatten the initial arc.
+
+5. OBSTACLE AVOIDANCE COMPLETENESS: Check every waypoint in the list against
+   all obstacle bubbles, not just approach/exit. Use 0.25m safety radius.
+   After nudging, re-check the nudged point (obstacles can be clustered).
+
+6. SPLINE ENDPOINT BCS: Switch from "not-a-knot" to clamped BCs at the start
+   (`bc_type=((1, [0,0,0]), "not-a-knot")`) so the drone launches forward
+   rather than curling backward from the start waypoint.
+
+Level weights: L0=1.0, L1=1.5, L2=2.0, L3=3.0. L3 uses random track layouts
+per seed — every improvement must generalize. Never hardcode gate positions.
+Gate normal = gate local x-axis (`Rotation.from_quat(q).apply([1,0,0])`), sign
+chosen to match track flow direction.
+Iteration 2: New subsample score 0.0 is not better than old score 2.427995925316271, skipping
+Iteration 3: Selected program 0 score: 0.8093319751054235
+Iteration 3: Proposed new text for instruction: ```python
+"""Minimum-snap inspired trajectory planner for drone racing.
+
+Geometric path: cubic spline (scipy) through carefully chosen gate waypoints.
+Timing: constant arc-speed with a conservative speed cap, clamped so the
+Mellinger controller can track reliably.
+
+Reference math: Richter, Bry, Roy 2016 (min-snap philosophy).
+
+Key design decisions:
+- Zero vel/acc feedforward: position-only targets track better with Mellinger.
+- Clamped spline BC: zero velocity at start (from hover) prevents backward
+  initial motion; zero at end ensures clean terminal hover.
+- Exit direction blended toward next gate: reduces approach angle on curved
+  tracks, especially important for L3 random layouts.
+- Final waypoint past last gate: gives drone a target after last crossing so
+  the trajectory doesn't abruptly stop at the exit waypoint.
+
+This file is hone's mutation target. Only this file is modified during evolution.
+No project-local imports — works as a standalone temp file during grader evaluation.
+"""
+from __future__ import annotations
+
+import numpy as np
+from scipy.interpolate import CubicSpline
+from scipy.spatial.transform import Rotation
+
+# --- Tunable parameters (primary hone targets) ---
+CRUISE_SPEED: float = 2.0      # m/s nominal traversal speed along path
+MAX_SPEED: float = 3.0         # m/s clamp on planned velocity norm
+APPROACH_DIST: float = 0.6     # m before gate center, along gate normal
+EXIT_DIST: float = 0.7         # m after gate center, along exit direction
+LIFTOFF_FRAC: float = 0.6      # fraction of height to first gate used for liftoff wpt
+MIN_SEGMENT_TIME: float = 0.25 # s minimum time per waypoint segment
+OBSTACLE_RADIUS: float = 0.22  # m safety bubble around each obstacle axis (xy)
+OBSTACLE_AVOID_OFFSET: float = 0.4  # m lateral offset when adding avoidance waypoint
+EXIT_BLEND: float = 0.5        # blend weight: 0=pure gate normal, 1=pure toward-next-gate
+
+
+class Planner:
+    """Cubic-spline drone racing trajectory planner.
+
+    Builds a smooth path through all gates with approach/exit waypoints
+    and parameterizes it by arc-length-proportional time at CRUISE_SPEED.
+    """
+
+    def __init__(self, obs: dict, info: dict, config) -> None:
+        self._freq: float = config.env.freq
+        self._n_gates: int = len(config.env.track.gates)
+        self._finished: bool = False
+
+        gates_pos = np.array(obs["gates_pos"], dtype=float)
+        gates_quat = np.array(obs["gates_quat"], dtype=float)
+        obstacles_pos = np.array(obs["obstacles_pos"], dtype=float)
+        start_pos = np.array(obs["pos"], dtype=float)
+
+        wpts = _build_waypoints(start_pos, gates_pos, gates_quat, obstacles_pos)
+        times = _assign_times(wpts)
+        self._spline = _fit_spline(wpts, times)
+        self._duration: float = float(times[-1])
+
+    def compute_target(self, obs: dict, info: dict | None, t: float) -> np.ndarray:
+        """Return desired state [pos(3), vel(3), acc(3), yaw, rates(3)] at time t.
+
+        Outputs position-only (zero vel/acc feedforward). The sim's Mellinger
+        controller handles the differentiation; passing spline derivatives as
+        feedforward destabilized tracking in practice.
+        """
+        t_c = float(np.clip(t, 0.0, self._duration))
+        pos = self._spline(t_c)
+
+        if t >= self._duration:
+            self._finished = True
+
+        return np.array([*pos, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], dtype=np.float32)
+
+    def step(
+        self,
+        obs: dict,
+        info: dict | None,
+        action: np.ndarray,
+        reward: float,
+        terminated: bool,
+        truncated: bool,
+    ) -> None:
+        pass
+
+    @property
+    def is_finished(self) -> bool:
+        return self._finished
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+def _gate_dir(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """Unit vector from a toward b."""
+    d = b - a
+    n = float(np.linalg.norm(d))
+    return d / n if n > 1e-3 else np.array([1.0, 0.0, 0.0])
+
+
+def _gate_normal_aligned(quat: np.ndarray, flow_dir: np.ndarray) -> np.ndarray:
+    """Gate normal (±x of gate frame) signed to align with `flow_dir`.
+
+    lsy_drone_racing gate collision geometry is thin in x, wide in y/z — so
+    the gate's local x-axis is the through-direction. We pick the sign that
+    matches the track flow (direction from previous waypoint to next gate).
+    """
+    rot = Rotation.from_quat(quat)
+    normal = rot.apply([1.0, 0.0, 0.0])
+    if float(np.dot(normal, flow_dir)) < 0.0:
+        normal = -normal
+    return normal
+
+
+def _build_waypoints(
+    start: np.ndarray,
+    gates_pos: np.ndarray,
+    gates_quat: np.ndarray,
+    obstacles_pos: np.ndarray | None = None,
+) -> np.ndarray:
+    """Build waypoint sequence through all gates.
+
+    Pattern: start → liftoff → (approach, center, exit) per gate → final hover
+    Exit direction blends gate normal with toward-next-gate to smooth curved tracks.
+    """
+    wpts: list[np.ndarray] = [start.copy()]
+
+    # Liftoff waypoint: elevated, slightly forward toward gate 0
+    g0 = gates_pos[0]
+    approach0_dir = _gate_dir(start, g0)
+    liftoff = start.copy()
+    # Ensure at least 0.25m liftoff even if gate is at or below start height
+    liftoff[2] = max(start[2] + 0.25, start[2] + LIFTOFF_FRAC * (g0[2] - start[2] + 0.3))
+    liftoff[:2] = start[:2] + 0.2 * approach0_dir[:2] * np.linalg.norm(g0[:2] - start[:2])
+    wpts.append(liftoff)
+
+    prev = liftoff.copy()
+    n = len(gates_pos)
+    last_exit_dir = approach0_dir.copy()
+
+    for i, (pos, quat) in enumerate(zip(gates_pos, gates_quat)):
+        # Gate flow direction: from previous waypoint toward NEXT gate (or extrapolated end).
+        next_point = gates_pos[i + 1] if i + 1 < n else (pos + (pos - prev))
+        flow_dir = next_point - prev
+        n_flow = float(np.linalg.norm(flow_dir))
+        flow_dir = flow_dir / n_flow if n_flow > 1e-3 else np.array([1.0, 0.0, 0.0])
+
+        # Gate normal: pick the ±x-axis of gate frame that best aligns with flow_dir.
+        normal = _gate_normal_aligned(quat, flow_dir)
+
+        approach_wpt = pos - APPROACH_DIST * normal
+
+        # Exit direction: blend gate normal with toward-next-gate for smoother curved paths.
+        if i + 1 < n:
+            to_next = _gate_dir(pos, gates_pos[i + 1])
+            exit_dir = (1.0 - EXIT_BLEND) * normal + EXIT_BLEND * to_next
+            exit_n = float(np.linalg.norm(exit_dir))
+            exit_dir = exit_dir / exit_n if exit_n > 1e-3 else normal
+        else:
+            exit_dir = normal
+        exit_wpt = pos + EXIT_DIST * exit_dir
+
+        # Shift approach/exit waypoints if they land inside an obstacle's xy bubble
+        if obstacles_pos is not None and len(obstacles_pos) > 0:
+            approach_wpt = _nudge_off_obstacles(approach_wpt, obstacles_pos, normal)
+            exit_wpt = _nudge_off_obstacles(exit_wpt, obstacles_pos, normal)
+
+        wpts.append(approach_wpt)
+        wpts.append(pos.copy())
+        wpts.append(exit_wpt)
+        prev = pos.copy()
+        last_exit_dir = exit_dir
+
+    # Final hover waypoint: 0.8m past the last exit to give the drone a clean terminal target.
+    final = wpts[-1] + 0.8 * last_exit_dir
+    if obstacles_pos is not None and len(obstacles_pos) > 0:
+        final = _nudge_off_obstacles(final, obstacles_pos, last_exit_dir)
+    wpts.append(final)
+
+    return np.array(wpts)
+
+
+def _nudge_off_obstacles(
+    wpt: np.ndarray,
+    obstacles_pos: np.ndarray,
+    normal: np.ndarray,
+) -> np.ndarray:
+    """If wpt is inside an obstacle's xy safety bubble, nudge it away perpendicular to normal.
+
+    Obstacles are vertical capsules; we work in xy only. Offset direction is
+    perpendicular to the gate normal (so the waypoint still lies in the gate
+    approach/exit plane at the correct x along the normal axis).
+    """
+    perp = np.array([-normal[1], normal[0], 0.0])
+    perp_n = float(np.linalg.norm(perp))
+    if perp_n < 1e-6:
+        perp = np.array([0.0, 1.0, 0.0])
+    else:
+        perp = perp / perp_n
+
+    for o in obstacles_pos:
+        dx = wpt[0] - o[0]
+        dy = wpt[1] - o[1]
+        dist = float(np.hypot(dx, dy))
+        if dist < OBSTACLE_RADIUS:
+            # Shift along perp, in the direction away from the obstacle
+            to_wpt_xy = np.array([dx, dy])
+            n_to = float(np.linalg.norm(to_wpt_xy))
+            if n_to > 1e-6:
+                sign = 1.0 if float(np.dot(perp[:2], to_wpt_xy / n_to)) > 0.0 else -1.0
+            else:
+                sign = 1.0
+            wpt = wpt + sign * OBSTACLE_AVOID_OFFSET * perp
+            break
+    return wpt
+
+
+def _assign_times(wpts: np.ndarray) -> np.ndarray:
+    """Assign cumulative times based on arc-length at CRUISE_SPEED."""
+    dists = np.linalg.norm(np.diff(wpts, axis=0), axis=1)
+    seg_times = np.maximum(dists / CRUISE_SPEED, MIN_SEGMENT_TIME)
+    return np.concatenate([[0.0], np.cumsum(seg_times)])
+
+
+def _fit_spline(wpts: np.ndarray, times: np.ndarray) -> CubicSpline:
+    """Fit a cubic spline with zero-velocity boundary conditions at both ends.
+
+    Clamped BCs match physical reality: drone starts from hover (zero vel)
+    and the final hover waypoint is also a rest point.
+    """
+    zero_vel = np.zeros(wpts.shape[1])
+    return CubicSpline(times, wpts, bc_type=((1, zero_vel), (1, zero_vel)))
+```
+Iteration 3: New subsample score 0.0 is not better than old score 2.427995925316271, skipping
+Iteration 4: Selected program 0 score: 0.8093319751054235
+Iteration 4: Proposed new text for instruction: Looking at the scoring (0.809) and the hone system's architecture, the "prompt" is the module docstring that guides the AI mutator. I need to make it more directive about specific improvements.
+
+```
+"""Drone racing trajectory planner — cubic spline, gate-waypoint sequence.
+
+CURRENT SCORE ≈ 0.809. Primary improvement targets ranked by score impact:
+
+PRIORITY 1 — SPEED (biggest gain available)
+  CRUISE_SPEED=1.5 m/s is 50% below the Mellinger tracking limit (~3 m/s).
+  Raise to 2.0–2.2 m/s. Use curvature-adaptive timing: compute spline curvature
+  κ at each waypoint; scale local speed by 1/(1 + k*κ) where k≈1.5. This slows
+  tight turns and keeps straights fast without crashing.
+
+PRIORITY 2 — APPROACH ANGLE (fixes L3 missed-gate failures)
+  Current flow_dir uses prev_waypoint → next_gate, which drifts with liftoff
+  geometry. Use gate[i-1] → gate[i+1] as the through-axis for gate i (skip
+  approach/exit waypoints when computing flow direction). Approach angles > 25°
+  at crossing mean the drone clips the gate frame on random tracks.
+
+PRIORITY 3 — TIMING FLOOR (removes distortion on short segments)
+  MIN_SEGMENT_TIME=0.5 s forces slow motion on short gate-to-gate hops.
+  Replace: seg_time = max(dist / CRUISE_SPEED, dist / MAX_SPEED + 0.05).
+  This preserves the safety margin without the hard 0.5s floor.
+
+PRIORITY 4 — SCHEDULE CORRECTION (reduces L2/L3 timeout crashes)
+  In compute_target, use obs["target_gate"] to estimate expected crossing time
+  for the next gate. If actual drone position is behind schedule by > 0.3s,
+  advance t_c by a small fraction to re-sync. This prevents timeout on longer
+  randomized tracks where timing drifts.
+
+PRIORITY 5 — SPLINE BC (reduce endpoint oscillation)
+  bc_type="not-a-knot" can overshoot at start/end. Switch to
+  bc_type=((1, np.zeros(3)), (1, np.zeros(3))) for zero-velocity endpoints.
+
+FIXED CONSTRAINTS — do not change:
+  • Return exactly np.float32[13]: [x,y,z, vx,vy,vz, ax,ay,az, yaw, rr, pr, yr]
+  • Keep vx,vy,vz,ax,ay,az = 0.0 (position-only commands track better)
+  • EXIT_DIST must stay ≥ 0.5 m (gate frame extends 0.36 m radially)
+  • Only imports: numpy, scipy, toppra — no project-local imports
+  • No print/log inside Planner methods (grader captures stderr)
+  • Level weights: L0=1.0, L1=1.5, L2=2.0, L3=3.0 — optimize L3 first
+"""
+```
+Iteration 4: New subsample score 0.0 is not better than old score 2.427995925316271, skipping
+Iteration 5: Selected program 0 score: 0.8093319751054235
+Iteration 5: Proposed new text for instruction: Looking at the current planner (score 0.809), I'll make three targeted improvements: (1) position-projection lookahead so the drone recovers from deviations by projecting its actual position onto the spline rather than using raw sim time, (2) yaw aligned with travel direction to reduce approach angles at gates, and (3) modest speed increase 1.5→1.8 m/s for better lap times on L3.
+
+"""Minimum-snap inspired trajectory planner for drone racing.
+
+Geometric path: cubic spline through carefully chosen gate waypoints.
+Timing: arc-length proportional at CRUISE_SPEED; at runtime the drone's
+actual position is projected onto the spline and a lookahead target is used.
+
+Key upgrades over v1:
+- Position projection + lookahead: at each step, project the drone's real
+  position onto the spline (within a forward-biased search window), then
+  target LOOKAHEAD_TIME seconds ahead. Robust to wind, inertia variation,
+  and small trajectory deviations — critical for L1/L2/L3 generalization.
+- Yaw aligned with travel direction: reduces gate approach angle (< 25 deg
+  threshold matters for consecutive gate success).
+- Speed increase 1.5 -> 1.8 m/s: better lap times without exceeding the
+  reliable Mellinger tracking range (~3 m/s).
+"""
+from __future__ import annotations
+
+import numpy as np
+from scipy.interpolate import CubicSpline
+from scipy.spatial.transform import Rotation
+
+# --- Tunable parameters ---
+CRUISE_SPEED: float = 1.8        # m/s nominal traversal speed along path
+APPROACH_DIST: float = 0.5       # m before gate center, along gate normal
+EXIT_DIST: float = 0.5           # m after gate center, along gate normal
+LIFTOFF_FRAC: float = 0.5        # fraction of height to first gate for liftoff wpt
+MIN_SEGMENT_TIME: float = 0.4    # s minimum time per waypoint segment
+OBSTACLE_RADIUS: float = 0.2     # m safety bubble around each obstacle (xy)
+OBSTACLE_AVOID_OFFSET: float = 0.35  # m lateral offset when nudging off obstacle
+LOOKAHEAD_TIME: float = 0.35     # s to target ahead of projected position on spline
+PROJ_WINDOW_FWD: float = 3.0     # s forward search window for position projection
+PROJ_WINDOW_BWD: float = 0.5     # s backward allowance (small corrections only)
+PROJ_SAMPLES: int = 50           # samples for projection grid search
+
+
+class Planner:
+    """Cubic-spline drone racing trajectory planner with position-projection lookahead."""
+
+    def __init__(self, obs: dict, info: dict, config) -> None:
+        self._freq: float = config.env.freq
+        self._n_gates: int = len(config.env.track.gates)
+        self._finished: bool = False
+
+        gates_pos = np.array(obs["gates_pos"], dtype=float)
+        gates_quat = np.array(obs["gates_quat"], dtype=float)
+        obstacles_pos = np.array(obs["obstacles_pos"], dtype=float)
+        start_pos = np.array(obs["pos"], dtype=float)
+
+        wpts = _build_waypoints(start_pos, gates_pos, gates_quat, obstacles_pos)
+        times = _assign_times(wpts)
+        self._spline = _fit_spline(wpts, times)
+        self._duration: float = float(times[-1])
+        self._t_proj: float = 0.0  # monotonically advancing projected spline time
+
+    def compute_target(self, obs: dict, info: dict | None, t: float) -> np.ndarray:
+        """Return desired state [pos(3), vel(3), acc(3), yaw, rates(3)] at lookahead point."""
+        pos_drone = np.array(obs["pos"], dtype=float)
+
+        # Project drone position onto spline, advance monotonically (never rewind)
+        t_raw = _project_time(self._spline, pos_drone, self._t_proj, self._duration)
+        self._t_proj = max(self._t_proj, t_raw)
+
+        # Target LOOKAHEAD_TIME seconds ahead of projected position
+        t_target = float(np.clip(self._t_proj + LOOKAHEAD_TIME, 0.0, self._duration))
+        pos_target = self._spline(t_target)
+
+        # Yaw aligned with spline travel direction for cleaner gate approaches
+        if t_target < self._duration - 0.05:
+            vel_dir = self._spline(t_target, 1)
+            yaw = float(np.arctan2(vel_dir[1], vel_dir[0]))
+        else:
+            yaw = 0.0
+
+        if self._t_proj >= self._duration - LOOKAHEAD_TIME * 0.5:
+            self._finished = True
+
+        return np.array(
+            [pos_target[0], pos_target[1], pos_target[2],
+             0.0, 0.0, 0.0,
+             0.0, 0.0, 0.0,
+             yaw,
+             0.0, 0.0, 0.0],
+            dtype=np.float32,
+        )
+
+    def step(
+        self,
+        obs: dict,
+        info: dict | None,
+        action: np.ndarray,
+        reward: float,
+        terminated: bool,
+        truncated: bool,
+    ) -> None:
+        pass
+
+    @property
+    def is_finished(self) -> bool:
+        return self._finished
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+def _project_time(
+    spline: CubicSpline,
+    pos: np.ndarray,
+    t_last: float,
+    duration: float,
+) -> float:
+    """Find spline parameter whose position is closest to pos, in window around t_last."""
+    t_lo = max(0.0, t_last - PROJ_WINDOW_BWD)
+    t_hi = min(duration, t_last + PROJ_WINDOW_FWD)
+    candidates = np.linspace(t_lo, t_hi, PROJ_SAMPLES)
+    pts = spline(candidates)
+    dists = np.linalg.norm(pts - pos, axis=1)
+    return float(candidates[np.argmin(dists)])
+
+
+def _gate_dir(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """Unit vector from a toward b."""
+    d = b - a
+    n = float(np.linalg.norm(d))
+    return d / n if n > 1e-3 else np.array([1.0, 0.0, 0.0])
+
+
+def _gate_normal_aligned(quat: np.ndarray, flow_dir: np.ndarray) -> np.ndarray:
+    """Gate normal (±x of gate frame) signed to align with flow_dir.
+
+    Gate collision geometry is thin in local x — that is the through-direction.
+    """
+    rot = Rotation.from_quat(quat)
+    normal = rot.apply([1.0, 0.0, 0.0])
+    if float(np.dot(normal, flow_dir)) < 0.0:
+        normal = -normal
+    return normal
+
+
+def _build_waypoints(
+    start: np.ndarray,
+    gates_pos: np.ndarray,
+    gates_quat: np.ndarray,
+    obstacles_pos: np.ndarray | None = None,
+) -> np.ndarray:
+    """Build waypoint sequence: start → liftoff → (approach, center, exit) × n_gates."""
+    wpts: list[np.ndarray] = [start.copy()]
+
+    g0 = gates_pos[0]
+    approach0_dir = _gate_dir(start, g0)
+    liftoff = start.copy()
+    liftoff[2] = start[2] + LIFTOFF_FRAC * (g0[2] - start[2] + 0.3)
+    liftoff[:2] = start[:2] + 0.2 * approach0_dir[:2] * np.linalg.norm(g0[:2] - start[:2])
+    wpts.append(liftoff)
+
+    prev = liftoff.copy()
+    n = len(gates_pos)
+    for i, (pos, quat) in enumerate(zip(gates_pos, gates_quat)):
+        next_point = gates_pos[i + 1] if i + 1 < n else (pos + (pos - prev))
+        flow_dir = next_point - prev
+        n_flow = float(np.linalg.norm(flow_dir))
+        flow_dir = flow_dir / n_flow if n_flow > 1e-3 else np.array([1.0, 0.0, 0.0])
+
+        normal = _gate_normal_aligned(quat, flow_dir)
+
+        approach_wpt = pos - APPROACH_DIST * normal
+        exit_wpt = pos + EXIT_DIST * normal
+
+        if obstacles_pos is not None and len(obstacles_pos) > 0:
+            approach_wpt = _nudge_off_obstacles(approach_wpt, obstacles_pos, normal)
+            exit_wpt = _nudge_off_obstacles(exit_wpt, obstacles_pos, normal)
+
+        wpts.append(approach_wpt)
+        wpts.append(pos.copy())
+        wpts.append(exit_wpt)
+        prev = pos.copy()
+
+    return np.array(wpts)
+
+
+def _nudge_off_obstacles(
+    wpt: np.ndarray,
+    obstacles_pos: np.ndarray,
+    normal: np.ndarray,
+) -> np.ndarray:
+    """If wpt is inside an obstacle's xy safety bubble, nudge it perpendicular to normal."""
+    perp = np.array([-normal[1], normal[0], 0.0])
+    perp_n = float(np.linalg.norm(perp))
+    if perp_n < 1e-6:
+        perp = np.array([0.0, 1.0, 0.0])
+    else:
+        perp = perp / perp_n
+
+    for o in obstacles_pos:
+        dx = wpt[0] - o[0]
+        dy = wpt[1] - o[1]
+        dist = float(np.hypot(dx, dy))
+        if dist < OBSTACLE_RADIUS:
+            to_wpt_xy = np.array([dx, dy])
+            n_to = float(np.linalg.norm(to_wpt_xy))
+            sign = 1.0
+            if n_to > 1e-6:
+                sign = 1.0 if float(np.dot(perp[:2], to_wpt_xy / n_to)) > 0.0 else -1.0
+            wpt = wpt + sign * OBSTACLE_AVOID_OFFSET * perp
+            break
+    return wpt
+
+
+def _assign_times(wpts: np.ndarray) -> np.ndarray:
+    """Assign cumulative times based on arc-length at CRUISE_SPEED."""
+    dists = np.linalg.norm(np.diff(wpts, axis=0), axis=1)
+    seg_times = np.maximum(dists / CRUISE_SPEED, MIN_SEGMENT_TIME)
+    return np.concatenate([[0.0], np.cumsum(seg_times)])
+
+
+def _fit_spline(wpts: np.ndarray, times: np.ndarray) -> CubicSpline:
+    """Fit a cubic spline through waypoints."""
+    return CubicSpline(times, wpts, bc_type="not-a-knot")
