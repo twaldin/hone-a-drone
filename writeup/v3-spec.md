@@ -790,6 +790,17 @@ When v3 ships:
    diff analysis (how much did the arms' rules diverge?), post-hoc
    cost-adjusted reward from mutations.jsonl.
 
+### Baseline arm retargeted 2026-04-21 (cairn → drone)
+
+Original plan: anthropic SDK direct for a "single API completion vs
+agent-in-loop" control. Blocked on API billing (OAuth-only env). Replaced
+with **claude-code single-shot (no-tools)**: harness:claude-code:sonnet
+invoked via HarnessMutator.propose() with prompt scaffolding that forbids
+Read / Edit / Bash tools. Contrast is narrower but tighter: "LLM-completion
+via OAuth with tool access vs without." Runner at
+`run_singleshot_baseline.py` (drone repo, not hone-v3). Arm label in
+mutations.jsonl + summary.json: `harness:claude-code:sonnet:no-tools`.
+
 Time estimate: 1-2 days from start to first full run. Smoke-able by end of
 day 1.
 
