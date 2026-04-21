@@ -1,0 +1,232 @@
+╭───────────────────────────── hone v2 (dir mode) ─────────────────────────────╮
+│ mode      dir                                                                │
+│ dir       /Users/twaldin/dev/hone-a-drone/controllers                        │
+│ files     attitude_ctrl.py, baseline.py, gate_detector.py, planner.py,       │
+│ state_estimator.py, world_model.py                                           │
+│ grader    grader.sh                                                          │
+│ mutator   HarnessMutator(model='sonnet')                                     │
+│ scheduler diagnose                                                           │
+│ observer  harness:claude-code:sonnet (every 10)                              │
+│ budget    100                                                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+[hone-v2 iter 1/100] target=attitude_ctrl.py best=-1.0000
+[hone-v2 iter 1] target=attitude_ctrl.py score=0.8093 fail_class=out_of_bounds
+[hone-v2 iter 2/100] target=planner.py best=0.8093
+[hone-v2 iter 2] target=planner.py score=0.4873 fail_class=out_of_bounds
+[hone-v2 iter 3/100] target=planner.py best=0.8093
+[hone-v2 iter 3] target=planner.py score=0.7972 fail_class=out_of_bounds
+[hone-v2 iter 4/100] target=planner.py best=0.8093
+[hone-v2 iter 4] target=planner.py score=0.4873 fail_class=out_of_bounds
+[hone-v2 iter 5/100] target=planner.py best=0.8093
+[hone-v2 iter 5] target=planner.py score=0.8093 fail_class=out_of_bounds
+[hone-v2 iter 6/100] target=planner.py best=0.8093
+[hone-v2 iter 6] target=planner.py score=0.1850 fail_class=out_of_bounds
+[hone-v2 iter 7/100] target=planner.py best=0.8093
+[hone-v2 iter 7] target=planner.py score=0.1850 fail_class=out_of_bounds
+[hone-v2 iter 8/100] target=planner.py best=0.8093
+[hone-v2 iter 8] target=planner.py score=0.6613 fail_class=out_of_bounds
+[hone-v2 iter 9/100] target=planner.py best=0.8093
+[hone-v2 iter 9] target=planner.py score=0.1883 fail_class=out_of_bounds
+[hone-v2 iter 10/100] target=planner.py best=0.8093
+[hone-v2 iter 10] target=planner.py score=0.8093 fail_class=out_of_bounds
+[hone-v2 observer@10] applied=True deltas=1 version=1
+[hone-v2 iter 11/100] target=planner.py best=0.8093
+[hone-v2 iter 11] target=planner.py score=0.4873 fail_class=out_of_bounds
+[hone-v2 iter 12/100] target=planner.py best=0.8093
+[hone-v2 iter 12] target=planner.py score=0.1750 fail_class=out_of_bounds
+[hone-v2 iter 13/100] target=planner.py best=0.8093
+[hone-v2 iter 13] target=planner.py score=0.1817 fail_class=out_of_bounds
+[hone-v2 iter 14/100] target=planner.py best=0.8093
+[hone-v2 iter 14] target=planner.py score=0.6612 fail_class=out_of_bounds
+[hone-v2 iter 15/100] target=planner.py best=0.8093
+[hone-v2 iter 15] target=planner.py score=0.8097 fail_class=out_of_bounds
+[hone-v2 iter 16/100] target=planner.py best=0.8097
+[hone-v2 iter 16] target=planner.py score=0.0617 fail_class=out_of_bounds
+[hone-v2 iter 17/100] target=planner.py best=0.8097
+[hone-v2 iter 17] target=planner.py score=0.1283 fail_class=out_of_bounds
+[hone-v2 iter 18/100] target=planner.py best=0.8097
+[hone-v2 iter 18] target=planner.py score=0.8097 fail_class=out_of_bounds
+[hone-v2 iter 19/100] target=planner.py best=0.8097
+[hone-v2 iter 19] target=planner.py score=0.2150 fail_class=out_of_bounds
+[hone-v2 iter 20/100] target=planner.py best=0.8097
+[hone-v2 iter 20] target=planner.py score=0.8104 fail_class=out_of_bounds
+[hone-v2 observer@20] applied=False deltas=0 version=0
+[hone-v2 iter 21/100] target=planner.py best=0.8104
+[hone-v2 iter 21] target=planner.py score=0.8424 fail_class=out_of_bounds
+[hone-v2 iter 22/100] target=planner.py best=0.8424
+[hone-v2 iter 22] target=planner.py score=0.0233 fail_class=out_of_bounds
+[hone-v2 iter 23/100] target=planner.py best=0.8424
+[hone-v2 iter 23] target=planner.py score=0.8424 fail_class=out_of_bounds
+[hone-v2 iter 24/100] target=planner.py best=0.8424
+[hone-v2 iter 24] target=planner.py score=0.0717 fail_class=out_of_bounds
+[hone-v2 iter 25/100] target=planner.py best=0.8424
+[hone-v2 iter 25] target=planner.py score=0.8424 fail_class=out_of_bounds
+[hone-v2 iter 26/100] target=planner.py best=0.8424
+[hone-v2 iter 26] target=planner.py score=0.0717 fail_class=out_of_bounds
+[hone-v2 iter 27/100] target=planner.py best=0.8424
+[hone-v2 iter 27] target=planner.py score=0.1150 fail_class=out_of_bounds
+[hone-v2 iter 28/100] target=planner.py best=0.8424
+[hone-v2 iter 28] target=planner.py score=0.6241 fail_class=out_of_bounds
+[hone-v2 iter 29/100] target=planner.py best=0.8424
+[hone-v2 iter 29] target=planner.py score=0.8424 fail_class=out_of_bounds
+[hone-v2 iter 30/100] target=planner.py best=0.8424
+[hone-v2 iter 30] target=planner.py score=0.8424 fail_class=out_of_bounds
+[hone-v2 observer@30] applied=True deltas=3 version=1
+[hone-v2 iter 31/100] target=planner.py best=0.8424
+[hone-v2 iter 31] target=planner.py score=0.1717 fail_class=out_of_bounds
+[hone-v2 iter 32/100] target=planner.py best=0.8424
+[hone-v2 iter 32] target=planner.py score=0.8324 fail_class=out_of_bounds
+[hone-v2 iter 33/100] target=planner.py best=0.8424
+[hone-v2 iter 33] target=planner.py score=0.8324 fail_class=out_of_bounds
+[hone-v2 iter 34/100] target=planner.py best=0.8424
+[hone-v2 iter 34] target=planner.py score=0.8324 fail_class=out_of_bounds
+[hone-v2 iter 35/100] target=planner.py best=0.8424
+[hone-v2 iter 35] MUTATOR ERROR: edit-mode harness 'claude-code' exited -1: 
+[hone-v2 iter 36/100] target=planner.py best=0.8424
+[hone-v2 iter 36] target=planner.py score=0.0133 fail_class=out_of_bounds
+[hone-v2 iter 37/100] target=planner.py best=0.8424
+[hone-v2 iter 37] target=planner.py score=0.8324 fail_class=out_of_bounds
+[hone-v2 iter 38/100] target=planner.py best=0.8424
+[hone-v2 iter 38] target=planner.py score=0.8324 fail_class=out_of_bounds
+[hone-v2 iter 39/100] target=planner.py best=0.8424
+[hone-v2 iter 39] target=planner.py score=0.1450 fail_class=out_of_bounds
+[hone-v2 iter 40/100] target=planner.py best=0.8424
+[hone-v2 iter 40] target=planner.py score=0.8324 fail_class=out_of_bounds
+[hone-v2 observer@40] applied=True deltas=2 version=2
+[hone-v2 iter 41/100] target=planner.py best=0.8424
+[hone-v2 iter 41] target=planner.py score=0.0750 fail_class=out_of_bounds
+[hone-v2 iter 42/100] target=planner.py best=0.8424
+[hone-v2 iter 42] target=planner.py score=0.0617 fail_class=out_of_bounds
+[hone-v2 iter 43/100] target=planner.py best=0.8424
+[hone-v2 iter 43] target=planner.py score=0.1717 fail_class=out_of_bounds
+[hone-v2 iter 44/100] target=planner.py best=0.8424
+[hone-v2 iter 44] target=planner.py score=0.1717 fail_class=out_of_bounds
+[hone-v2 iter 45/100] target=planner.py best=0.8424
+[hone-v2 iter 45] target=planner.py score=0.1450 fail_class=out_of_bounds
+[hone-v2 iter 46/100] target=planner.py best=0.8424
+[hone-v2 iter 46] target=planner.py score=0.1450 fail_class=out_of_bounds
+[hone-v2 iter 47/100] target=planner.py best=0.8424
+[hone-v2 iter 47] target=planner.py score=0.8324 fail_class=out_of_bounds
+[hone-v2 iter 48/100] target=planner.py best=0.8424
+[hone-v2 iter 48] target=planner.py score=0.1650 fail_class=out_of_bounds
+[hone-v2 iter 49/100] target=planner.py best=0.8424
+[hone-v2 iter 49] target=planner.py score=0.1717 fail_class=out_of_bounds
+[hone-v2 iter 50/100] target=planner.py best=0.8424
+[hone-v2 iter 50] target=planner.py score=0.0133 fail_class=out_of_bounds
+[hone-v2 observer@50] applied=False deltas=0 version=1
+[hone-v2 iter 51/100] target=planner.py best=0.8424
+[hone-v2 iter 51] target=planner.py score=0.8424 fail_class=out_of_bounds
+[hone-v2 iter 52/100] target=planner.py best=0.8424
+[hone-v2 iter 52] target=planner.py score=0.8424 fail_class=out_of_bounds
+[hone-v2 iter 53/100] target=planner.py best=0.8424
+[hone-v2 iter 53] target=planner.py score=0.8037 fail_class=out_of_bounds
+[hone-v2 iter 54/100] target=planner.py best=0.8424
+[hone-v2 iter 54] target=planner.py score=0.8424 fail_class=out_of_bounds
+[hone-v2 iter 55/100] target=planner.py best=0.8424
+[hone-v2 iter 55] target=planner.py score=0.5992 fail_class=out_of_bounds
+[hone-v2 iter 56/100] target=planner.py best=0.8424
+[hone-v2 iter 56] target=planner.py score=0.9925 fail_class=out_of_bounds
+[hone-v2 iter 57/100] target=planner.py best=0.9925
+[hone-v2 iter 57] target=planner.py score=0.0283 fail_class=out_of_bounds
+[hone-v2 iter 58/100] target=planner.py best=0.9925
+[hone-v2 iter 58] target=planner.py score=0.4228 fail_class=out_of_bounds
+[hone-v2 iter 59/100] target=planner.py best=0.9925
+[hone-v2 iter 59] target=planner.py score=0.3111 fail_class=out_of_bounds
+[hone-v2 iter 60/100] target=planner.py best=0.9925
+[hone-v2 iter 60] target=planner.py score=0.1917 fail_class=out_of_bounds
+[hone-v2 observer@60] applied=True deltas=3 version=2
+[hone-v2 iter 61/100] target=planner.py best=0.9925
+[hone-v2 iter 61] target=planner.py score=0.1883 fail_class=out_of_bounds
+[hone-v2 iter 62/100] target=planner.py best=0.9925
+[hone-v2 iter 62] target=planner.py score=0.8973 fail_class=out_of_bounds
+[hone-v2 iter 63/100] target=planner.py best=0.9925
+[hone-v2 iter 63] target=planner.py score=0.9925 fail_class=out_of_bounds
+[hone-v2 iter 64/100] target=planner.py best=0.9925
+[hone-v2 iter 64] target=planner.py score=0.6342 fail_class=out_of_bounds
+[hone-v2 iter 65/100] target=planner.py best=0.9925
+[hone-v2 iter 65] target=planner.py score=0.2150 fail_class=out_of_bounds
+[hone-v2 iter 66/100] target=planner.py best=0.9925
+[hone-v2 iter 66] target=planner.py score=0.1883 fail_class=out_of_bounds
+[hone-v2 iter 67/100] target=planner.py best=0.9925
+[hone-v2 iter 67] target=planner.py score=0.9925 fail_class=out_of_bounds
+[hone-v2 iter 68/100] target=planner.py best=0.9925
+[hone-v2 iter 68] target=planner.py score=0.2083 fail_class=out_of_bounds
+[hone-v2 iter 69/100] target=planner.py best=0.9925
+[hone-v2 iter 69] target=planner.py score=0.0850 fail_class=out_of_bounds
+[hone-v2 iter 70/100] target=planner.py best=0.9925
+[hone-v2 iter 70] target=planner.py score=0.9925 fail_class=out_of_bounds
+[hone-v2 observer@70] applied=True deltas=1 version=3
+[hone-v2 iter 71/100] target=planner.py best=0.9925
+[hone-v2 iter 71] target=planner.py score=0.9925 fail_class=out_of_bounds
+[hone-v2 iter 72/100] target=planner.py best=0.9925
+[hone-v2 iter 72] target=planner.py score=0.9925 fail_class=out_of_bounds
+[hone-v2 iter 73/100] target=planner.py best=0.9925
+[hone-v2 iter 73] target=planner.py score=0.9925 fail_class=out_of_bounds
+[hone-v2 iter 74/100] target=planner.py best=0.9925
+[hone-v2 iter 74] target=planner.py score=0.2217 fail_class=out_of_bounds
+[hone-v2 iter 75/100] target=planner.py best=0.9925
+[hone-v2 iter 75] target=planner.py score=0.9925 fail_class=out_of_bounds
+[hone-v2 iter 76/100] target=planner.py best=0.9925
+[hone-v2 iter 76] target=planner.py score=0.9925 fail_class=out_of_bounds
+[hone-v2 iter 77/100] target=planner.py best=0.9925
+[hone-v2 iter 77] target=planner.py score=0.9925 fail_class=out_of_bounds
+[hone-v2 iter 78/100] target=planner.py best=0.9925
+[hone-v2 iter 78] target=planner.py score=0.9925 fail_class=out_of_bounds
+[hone-v2 iter 79/100] target=planner.py best=0.9925
+[hone-v2 iter 79] target=planner.py score=0.9925 fail_class=out_of_bounds
+[hone-v2 iter 80/100] target=planner.py best=0.9925
+[hone-v2 iter 80] target=planner.py score=0.9925 fail_class=out_of_bounds
+[hone-v2 observer@80] applied=True deltas=1 version=4
+[hone-v2 iter 81/100] target=planner.py best=0.9925
+[hone-v2 iter 81] target=planner.py score=0.1033 fail_class=out_of_bounds
+[hone-v2 iter 82/100] target=planner.py best=0.9925
+[hone-v2 iter 82] target=planner.py score=0.2017 fail_class=out_of_bounds
+[hone-v2 iter 83/100] target=planner.py best=0.9925
+[hone-v2 iter 83] target=planner.py score=0.2083 fail_class=out_of_bounds
+[hone-v2 iter 84/100] target=planner.py best=0.9925
+[hone-v2 iter 84] target=planner.py score=0.1217 fail_class=out_of_bounds
+[hone-v2 iter 85/100] target=planner.py best=0.9925
+[hone-v2 iter 85] target=planner.py score=0.1317 fail_class=out_of_bounds
+[hone-v2 iter 86/100] target=planner.py best=0.9925
+[hone-v2 iter 86] target=planner.py score=0.9925 fail_class=out_of_bounds
+[hone-v2 iter 87/100] target=planner.py best=0.9925
+[hone-v2 iter 87] target=planner.py score=0.0233 fail_class=out_of_bounds
+[hone-v2 iter 88/100] target=planner.py best=0.9925
+[hone-v2 iter 88] target=planner.py score=0.9925 fail_class=out_of_bounds
+[hone-v2 iter 89/100] target=planner.py best=0.9925
+[hone-v2 iter 89] target=planner.py score=0.2083 fail_class=out_of_bounds
+[hone-v2 iter 90/100] target=planner.py best=0.9925
+[hone-v2 iter 90] target=planner.py score=0.2000 fail_class=out_of_bounds
+[hone-v2 observer@90] applied=False deltas=0 version=3
+[hone-v2 iter 91/100] target=planner.py best=0.9925
+[hone-v2 iter 91] target=planner.py score=0.0283 fail_class=out_of_bounds
+[hone-v2 iter 92/100] target=planner.py best=0.9925
+[hone-v2 iter 92] target=planner.py score=0.1917 fail_class=out_of_bounds
+[hone-v2 iter 93/100] target=planner.py best=0.9925
+[hone-v2 iter 93] target=planner.py score=0.1783 fail_class=out_of_bounds
+[hone-v2 iter 94/100] target=planner.py best=0.9925
+[hone-v2 iter 94] target=planner.py score=0.8263 fail_class=out_of_bounds
+[hone-v2 iter 95/100] target=planner.py best=0.9925
+[hone-v2 iter 95] MUTATOR ERROR: edit-mode harness 'claude-code' exited -1: 
+[hone-v2 iter 96/100] target=planner.py best=0.9925
+[hone-v2 iter 96] target=planner.py score=0.2083 fail_class=out_of_bounds
+[hone-v2 iter 97/100] target=planner.py best=0.9925
+[hone-v2 iter 97] target=planner.py score=0.2815 fail_class=out_of_bounds
+[hone-v2 iter 98/100] target=planner.py best=0.9925
+[hone-v2 iter 98] target=planner.py score=0.2017 fail_class=out_of_bounds
+[hone-v2 iter 99/100] target=planner.py best=0.9925
+[hone-v2 iter 99] target=planner.py score=0.9925 fail_class=out_of_bounds
+[hone-v2 iter 100/100] target=planner.py best=0.9925
+[hone-v2 iter 100] target=planner.py score=0.6275 fail_class=out_of_bounds
+[hone-v2 observer@100] applied=True deltas=4 version=4
+
+╭──────────────────────────────────── done ────────────────────────────────────╮
+│ best score       0.9925                                                      │
+│ iterations       98                                                          │
+│ mutator calls    98 (0 failed)                                               │
+│ mutator tokens   in=879  out=1,256,372                                       │
+│ mutator cost     $35.9424                                                    │
+│ run dir                                                                      │
+│ /Users/twaldin/dev/hone-a-drone/.hone/run-20260420-182940-1d2d06             │
+│ best dir written controllers.v2rerun-honed                                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
