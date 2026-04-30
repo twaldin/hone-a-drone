@@ -21,3 +21,30 @@ runs/logs/
 .claude/
 sim/
 
+# Agent instruction files
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+
+# Internal docs / drafts
+BLOG-DRAFT.md
+writeup/
+memory/
+handoffs/
+experiments/
+
+# Run-output observation logs
+runs/observations*.md
+runs-aborted-run1/
+runs-v2/
+runs-*/
+
+# Scratch result snapshots
+HONE_DRONE_RESULTS_*.md
+
+# Controller scratch dirs
+controllers.v*-smoke/
+best-v*/
+*.honed.md
+*.best.md
+
