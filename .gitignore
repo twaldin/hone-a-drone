@@ -48,3 +48,6 @@ best-v*/
 *.honed.md
 *.best.md
 
+
+# flt agent fleet artifacts (per-spawn scratch + handoff docs)
+.flt/
