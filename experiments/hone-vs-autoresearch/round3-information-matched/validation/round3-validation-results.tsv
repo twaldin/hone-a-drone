@@ -1,0 +1,11 @@
+lane	type	train_best	validation	controller
+01	AR	1.036583235270	0.9968405658043995	experiments/hone-vs-autoresearch/round3-information-matched/autoresearch-r3-info-01
+01	H	0.933	1.0452952657513928	experiments/hone-vs-autoresearch/round3-information-matched/outputs/hone-r3-info-01-best
+02	AR	1.088505658550	0.9826867055215923	experiments/hone-vs-autoresearch/round3-information-matched/autoresearch-r3-info-02
+02	H	0.921	0.9345706192024323	experiments/hone-vs-autoresearch/round3-information-matched/outputs/hone-r3-info-02-best
+03	AR	1.057341268966	0.9647534650739833	experiments/hone-vs-autoresearch/round3-information-matched/autoresearch-r3-info-03
+03	H	0.963	0.7884378746389503	experiments/hone-vs-autoresearch/round3-information-matched/outputs/hone-r3-info-03-best
+04	AR	1.085519432713	0.9951514261488268	experiments/hone-vs-autoresearch/round3-information-matched/autoresearch-r3-info-04
+04	H	1.126	1.0144401118710353	experiments/hone-vs-autoresearch/round3-information-matched/outputs/hone-r3-info-04-best
+05	AR	1.067800000000	1.0359950164444316	experiments/hone-vs-autoresearch/round3-information-matched/autoresearch-r3-info-05
+05	H	0.942	0.9153994002282142	experiments/hone-vs-autoresearch/round3-information-matched/outputs/hone-r3-info-05-best
