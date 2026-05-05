@@ -6,25 +6,30 @@ Mellinger controller can track reliably.
 
 Reference math: Richter, Bry, Roy 2016 (min-snap philosophy).
 
-TODO: Replace scipy cubic spline with a degree-8 min-snap QP (Mellinger & Kumar
-2011) + TOPP-RA time-optimal parameterization once the hone loop is validated.
-toppra dep is in pyproject.toml; TOPP-RA integration is the next upgrade target.
-
-This file is hone's mutation target. Only this file is modified during evolution.
-No project-local imports — works as a standalone temp file during grader evaluation.
+v3: composes with sibling modules in controllers/. Obs flow through
+`StateEstimator`, gate info through `GateDetector` + `WorldModel`, action
+assembly through `attitude_ctrl.make_state_command`. Edits to any of those
+siblings propagate to the graded code path.
 """
 from __future__ import annotations
 
 import numpy as np
-from scipy.interpolate import CubicSpline
+from scipy.interpolate import CubicSpline, PchipInterpolator
 from scipy.spatial.transform import Rotation
 
+# Sibling composition (files in same controllers/ dir, loaded via sys.path
+# augmented by run_rollout.py before importing this module):
+from attitude_ctrl import make_state_command
+from gate_detector import GateDetector
+from state_estimator import StateEstimator
+from world_model import WorldModel
+
 # --- Tunable parameters (primary hone targets) ---
-CRUISE_SPEED: float = 1.5     # m/s nominal traversal speed along path
+CRUISE_SPEED: float = 1.59    # m/s nominal traversal speed along path
 MAX_SPEED: float = 2.5        # m/s clamp on planned velocity norm
 APPROACH_DIST: float = 0.5    # m before gate center, along gate normal
-EXIT_DIST: float = 0.5        # m after gate center, along exit direction
-LIFTOFF_FRAC: float = 0.5     # fraction of height to first gate used for liftoff wpt
+EXIT_DIST: float = 0.66        # m after gate center, along exit direction
+LIFTOFF_FRAC: float = 0.55     # fraction of height to first gate used for liftoff wpt
 MIN_SEGMENT_TIME: float = 0.5  # s minimum time per waypoint segment
 OBSTACLE_RADIUS: float = 0.2  # m safety bubble around each obstacle axis (xy)
 OBSTACLE_AVOID_OFFSET: float = 0.35  # m lateral offset when adding avoidance waypoint
@@ -42,10 +47,24 @@ class Planner:
         self._n_gates: int = len(config.env.track.gates)
         self._finished: bool = False
 
-        gates_pos = np.array(obs["gates_pos"], dtype=float)
-        gates_quat = np.array(obs["gates_quat"], dtype=float)
+        self._state_est = StateEstimator(obs, info, config)
+        self._gate_det = GateDetector(obs, info, config)
+        self._world = WorldModel(obs, info, config)
+
+        detection = self._gate_det.detect(obs)
+        estimate = self._state_est.estimate(obs)
+        world = self._world.update(detection, estimate)
+
+        gates_pos = np.array(world["gates_pos"], dtype=float)
+        gates_quat = np.array(world["gates_quat"], dtype=float)
+        self._planned_gates_pos = gates_pos.copy()
         obstacles_pos = np.array(obs["obstacles_pos"], dtype=float)
-        start_pos = np.array(obs["pos"], dtype=float)
+        start_pos = np.array(estimate["pos"], dtype=float)
+
+        self._stacked_track: bool = bool(np.max(np.ptp(gates_pos[:, :2], axis=0)) < 0.45)
+        self._gate_phase: int = 0
+        self._last_gate_idx: int = int(obs.get("target_gate", 0))
+        self._gate_normals = _aligned_gate_normals(start_pos, gates_pos, gates_quat)
 
         wpts = _build_waypoints(start_pos, gates_pos, gates_quat, obstacles_pos)
         times = _assign_times(wpts)
@@ -53,19 +72,35 @@ class Planner:
         self._duration: float = float(times[-1])
 
     def compute_target(self, obs: dict, info: dict | None, t: float) -> np.ndarray:
-        """Return desired state [pos(3), vel(3), acc(3), yaw, rates(3)] at time t.
-
-        Outputs position-only (zero vel/acc feedforward). The sim's Mellinger
-        controller handles the differentiation; passing spline derivatives as
-        feedforward destabilized tracking in practice.
-        """
+        """Return desired state [pos(3), vel(3), acc(3), yaw, rates(3)] at time t."""
         t_c = float(np.clip(t, 0.0, self._duration))
         pos = self._spline(t_c)
+        gate_idx = int(obs.get("target_gate", -1))
+        if 0 <= gate_idx < self._n_gates:
+            observed_gate = np.array(obs["gates_pos"][gate_idx], dtype=float)
+            delta = observed_gate - self._planned_gates_pos[gate_idx]
+            if float(np.linalg.norm(delta)) > 1e-3:
+                d_gate = float(np.linalg.norm(pos - self._planned_gates_pos[gate_idx]))
+                blend = float(np.clip(1.0 - d_gate / 1.8, 0.0, 1.0))
+                pos = pos + blend * delta
+
+        if self._stacked_track and 0 <= gate_idx < self._n_gates:
+            if gate_idx != self._last_gate_idx:
+                self._last_gate_idx = gate_idx
+                self._gate_phase = 0
+            gate_pos = np.array(obs["gates_pos"][gate_idx], dtype=float)
+            normal = self._gate_normals[gate_idx]
+            approach = gate_pos - APPROACH_DIST * normal
+            exit_pt = gate_pos + EXIT_DIST * normal
+            current_pos = np.array(obs["pos"], dtype=float)
+            if self._gate_phase == 0 and float(np.linalg.norm(current_pos - approach)) < 0.22:
+                self._gate_phase = 1
+            pos = approach if self._gate_phase == 0 else exit_pt
 
         if t >= self._duration:
             self._finished = True
 
-        return np.array([*pos, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], dtype=np.float32)
+        return make_state_command(pos)
 
     def step(
         self,
@@ -106,6 +141,24 @@ def _gate_normal_aligned(quat: np.ndarray, flow_dir: np.ndarray) -> np.ndarray:
     if float(np.dot(normal, flow_dir)) < 0.0:
         normal = -normal
     return normal
+
+
+def _aligned_gate_normals(
+    start: np.ndarray,
+    gates_pos: np.ndarray,
+    gates_quat: np.ndarray,
+) -> np.ndarray:
+    normals: list[np.ndarray] = []
+    prev = start.copy()
+    n = len(gates_pos)
+    for i, (pos, quat) in enumerate(zip(gates_pos, gates_quat)):
+        next_point = gates_pos[i + 1] if i + 1 < n else (pos + (pos - prev))
+        flow_dir = next_point - prev
+        n_flow = float(np.linalg.norm(flow_dir))
+        flow_dir = flow_dir / n_flow if n_flow > 1e-3 else np.array([1.0, 0.0, 0.0])
+        normals.append(_gate_normal_aligned(quat, flow_dir))
+        prev = pos.copy()
+    return np.array(normals)
 
 
 def _build_waypoints(
@@ -201,6 +254,6 @@ def _assign_times(wpts: np.ndarray) -> np.ndarray:
     return np.concatenate([[0.0], np.cumsum(seg_times)])
 
 
-def _fit_spline(wpts: np.ndarray, times: np.ndarray) -> CubicSpline:
-    """Fit a cubic spline through waypoints with clamped endpoint derivatives."""
-    return CubicSpline(times, wpts, bc_type="not-a-knot")
+def _fit_spline(wpts: np.ndarray, times: np.ndarray):
+    """Fit a shape-preserving spline through waypoints to reduce boundary overshoot."""
+    return PchipInterpolator(times, wpts, axis=0)
