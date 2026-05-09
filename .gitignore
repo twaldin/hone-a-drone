@@ -44,9 +44,15 @@ HONE_DRONE_RESULTS_*.md
 
 # Controller scratch dirs
 controllers.v*-smoke/
+controllers.*-honed/
 best-v*/
 *.honed.md
 *.best.md
+
+# Baseline launch scripts and ablation scratch
+launch_*_baseline.sh
+scheduler.json
+disclosure.md
 
 
 # flt agent fleet artifacts (per-spawn scratch + handoff docs)
