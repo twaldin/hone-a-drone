@@ -1,6 +1,8 @@
 # ROADMAP — Dynamic Pointing
 
-v1 (tonight) evolves a single file: `controllers/planner.py`. That's deliberate — validate the hone→grader→mutator loop end-to-end on a proxy sim before adding any scheduler machinery. Everything below is queued for after v1 shows measurable improvement.
+This is the historical dynamic-pointing proposal, not an implemented scheduler or a current status report. The initial v1 plan evolved a single file, `controllers/planner.py`, to validate the hone→grader→mutator loop on a proxy sim before adding scheduling machinery. Later experiment records live in [experiments/hone-vs-autoresearch/](experiments/hone-vs-autoresearch/) and [posts/](posts/); the committed legacy demo still targets the planner, while the grader also accepts a controller directory.
+
+The progression and decision rules below are preserved as design research. No `hone-a-drone diagnose` command or autonomous rotation scheduler is tracked here. The current simulator-observation adapters also do not expose the proposed vision-dropout diagnosis.
 
 ## The core risk when pointing at multiple modules
 
@@ -25,11 +27,11 @@ Small script that reads the last run's per-rollout logs and classifies failure m
 Each failure mode maps to a module. Prints `bottleneck: gate_detector (62% of failures)` and suggests the hone command. Still human-in-the-loop but removes the eyeballing step.
 
 ### Level 2 — Multi-module hone via GEPA's scope selection
-GEPA supports multi-artifact optimization natively — pass it `{"planner": planner_code, "state_estimator": state_code, ...}` and it picks which to mutate per iteration based on Pareto reasoning. hone's `custom_candidate_proposer` hook exposes this. Right end-state, heavier to build; only worth it once Level 1 is paying off.
+The original GEPA-backed hone design proposed multi-artifact optimization: pass `{"planner": planner_code, "state_estimator": state_code, ...}` and select which artifact to mutate using Pareto reasoning. It referenced hone's `custom_candidate_proposer` hook. Preserve this as a design direction, not a current hone API recipe; the upstream CLI and architecture have since changed (see [README.md](README.md#setup-and-command-status)).
 
 ### Level 3 — Autonomous rotation meta-loop
 `diagnose` becomes the scheduler: run N iterations on the current bottleneck, read results, pick next module, repeat. Walk away for a weekend, come back to a rotated, more-mutated stack. Full rotations are expensive, so every sub-loop needs to be well-tuned before this is worth it.
 
 ## When to start caring
 
-Not yet. Get `controllers/planner.py` evolving and producing measurable improvement on the proxy sim first. That's the validation the loop works. Once there's a working baseline where hone reliably improves a single module, the payoff from rotating to others is real and the machinery above earns its keep. Building the scheduler before the single-module loop is proven is premature optimization — literally.
+The original sequencing rule still captures the tradeoff: establish a working single-module baseline and measurable improvement on the proxy sim before investing in rotation machinery. The dated experiment records document subsequent work; deciding whether those results justify a scheduler is separate from documenting what is implemented.
